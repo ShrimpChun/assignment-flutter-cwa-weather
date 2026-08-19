@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/error/weather_failure.dart';
+import 'weather_status_message.dart';
 
 /// 呼叫 API 失敗時顯示的錯誤畫面，依 [failure] 顯示對應的錯誤說明文字。
 class WeatherErrorView extends StatelessWidget {
@@ -17,38 +18,18 @@ class WeatherErrorView extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          key: const Key('weatherErrorView'),
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _iconFor(failure),
-              size: 88,
-              color: colorScheme.error,
+    return WeatherStatusMessage(
+      key: const Key('weatherErrorView'),
+      visual: Icon(_iconFor(failure), size: 88, color: colorScheme.error),
+      title: failure.message,
+      titleStyle: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurface),
+      action: onRetry == null
+          ? null
+          : FilledButton.tonalIcon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('重試'),
             ),
-            const SizedBox(height: 20),
-            Text(
-              failure.message,
-              key: const Key('weatherErrorMessage'),
-              style: textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 24),
-              FilledButton.tonalIcon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('重試'),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 

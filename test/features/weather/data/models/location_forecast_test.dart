@@ -117,6 +117,28 @@ void main() {
       );
     });
 
+    test('MinT 的時段與 Wx 的時段對不上時拋出 DataParsingFailure（不會靜默配對到錯誤時段）', () {
+      final json = _validLocationJson();
+      final elements = (json['weatherElement'] as List<dynamic>).map((raw) {
+        final element = Map<String, dynamic>.from(raw as Map<String, dynamic>);
+        if (element['elementName'] == 'MinT') {
+          element['time'] = (element['time'] as List<dynamic>).map((raw) {
+            final time = Map<String, dynamic>.from(raw as Map<String, dynamic>);
+            time['startTime'] = '2099-01-01 00:00:00';
+            time['endTime'] = '2099-01-01 12:00:00';
+            return time;
+          }).toList();
+        }
+        return element;
+      }).toList();
+      json['weatherElement'] = elements;
+
+      expect(
+        () => LocationForecast.fromJson(json),
+        throwsA(isA<DataParsingFailure>()),
+      );
+    });
+
     test('PoP（降雨機率）要素缺漏時，rainProbabilityPercent 為 null 且其餘欄位正常解析', () {
       final json = _validLocationJson();
       final elements = List<dynamic>.from(json['weatherElement'] as List)

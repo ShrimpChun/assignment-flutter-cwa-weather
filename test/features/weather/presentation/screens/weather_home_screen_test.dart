@@ -83,6 +83,32 @@ void main() {
     verifyNever(() => repository.fetchForecast(any()));
   });
 
+  testWidgets('查詢成功後點擊清除按鈕，會清空輸入框並將畫面重設為初始狀態', (
+    tester,
+  ) async {
+    when(
+      () => repository.fetchForecast('臺北市'),
+    ).thenAnswer((_) async => taipeiForecast);
+
+    await tester.pumpWidget(buildTestable());
+    await tester.enterText(
+      find.byKey(const Key('weatherSearchField')),
+      '臺北市',
+    );
+    await tester.tap(find.byKey(const Key('weatherSearchConfirmButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('weatherResultView')), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.clear_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('weatherInitialView')), findsOneWidget);
+    final textField = tester.widget<TextField>(
+      find.byKey(const Key('weatherSearchField')),
+    );
+    expect(textField.controller!.text, isEmpty);
+  });
+
   testWidgets('查詢地區不存在時，顯示對應的錯誤說明', (tester) async {
     when(
       () => repository.fetchForecast('不存在的地區'),

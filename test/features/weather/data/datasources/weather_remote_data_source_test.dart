@@ -98,6 +98,31 @@ void main() {
       );
     });
 
+    test('success 為 JSON 布林值 false 時（而非字串）也視為 UnauthorizedFailure', () async {
+      stubGet(
+        responseWith({
+          'success': false,
+          'records': <String, dynamic>{},
+        }),
+      );
+      final dataSource = WeatherRemoteDataSource(dio, apiKey: 'bad-key');
+
+      await expectLater(
+        dataSource.fetchForecast('臺北市'),
+        throwsA(isA<UnauthorizedFailure>()),
+      );
+    });
+
+    test('success 欄位缺漏時，視為成功並繼續正常解析', () async {
+      final body = validForecastResponse()..remove('success');
+      stubGet(responseWith(body));
+      final dataSource = WeatherRemoteDataSource(dio, apiKey: 'fake-key');
+
+      final forecast = await dataSource.fetchForecast('臺北市');
+
+      expect(forecast.locationName, '臺北市');
+    });
+
     test('回應主體不是 JSON 物件時拋出 DataParsingFailure', () async {
       stubGet(responseWith('<html>unexpected</html>'));
       final dataSource = WeatherRemoteDataSource(dio, apiKey: 'fake-key');
@@ -152,6 +177,27 @@ void main() {
       await expectLater(
         dataSource.fetchForecast('臺北市'),
         throwsA(isA<NetworkFailure>()),
+      );
+    });
+
+    test('無法歸類的錯誤（unknown）時拋出 UnknownFailure，而非誤導成網路問題', () async {
+      when(
+        () => dio.get<dynamic>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(
+            path: ApiEndpoints.generalForecast36h,
+          ),
+        ),
+      );
+      final dataSource = WeatherRemoteDataSource(dio, apiKey: 'fake-key');
+
+      await expectLater(
+        dataSource.fetchForecast('臺北市'),
+        throwsA(isA<UnknownFailure>()),
       );
     });
 

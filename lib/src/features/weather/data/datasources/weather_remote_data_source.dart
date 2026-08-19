@@ -47,8 +47,7 @@ class WeatherRemoteDataSource {
       throw const DataParsingFailure();
     }
 
-    final success = body['success'];
-    if (success is String && success.toLowerCase() != 'true') {
+    if (!_isSuccess(body['success'])) {
       throw const UnauthorizedFailure();
     }
 
@@ -74,15 +73,32 @@ class WeatherRemoteDataSource {
     return LocationForecast.fromJson(firstLocation);
   }
 
+  /// 判斷 API 回應中的 `success` 欄位是否代表成功。
+  ///
+  /// 中央氣象署官方文件中 `success` 為字串 `"true"`/`"false"`，但也一併
+  /// 容忍 JSON 布林值 `true`/`false`，避免未來 API 回應格式微調時，
+  /// 錯誤地把授權失敗誤判為格式錯誤。缺少此欄位則視為成功（沿用舊行為，
+  /// 交由後續的 `records` 檢查把關資料完整性）。
+  bool _isSuccess(Object? success) {
+    return switch (success) {
+      final String value => value.toLowerCase() == 'true',
+      final bool value => value,
+      null => true,
+      _ => false,
+    };
+  }
+
   WeatherFailure _mapDioException(DioException error) {
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
+      case DioExceptionType.transformTimeout:
       case DioExceptionType.connectionError:
       case DioExceptionType.badCertificate:
         return const NetworkFailure();
       case DioExceptionType.cancel:
+      case DioExceptionType.unknown:
         return const UnknownFailure();
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
@@ -90,9 +106,6 @@ class WeatherRemoteDataSource {
           return const UnauthorizedFailure();
         }
         return ServerFailure(statusCode: statusCode);
-      case DioExceptionType.unknown:
-      case DioExceptionType.transformTimeout:
-        return const NetworkFailure();
     }
   }
 }

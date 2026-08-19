@@ -55,8 +55,7 @@ class LocationForecast extends Equatable {
     final wxTimes = elementsByName['Wx']!;
     final periods = <WeatherPeriod>[];
 
-    for (var i = 0; i < wxTimes.length; i++) {
-      final wxEntry = wxTimes[i];
+    for (final wxEntry in wxTimes) {
       if (wxEntry is! Map<String, dynamic>) {
         throw const DataParsingFailure();
       }
@@ -75,25 +74,21 @@ class LocationForecast extends Equatable {
                   elementsByName['PoP']!,
                   startTime,
                   endTime,
-                  i,
                 ),
           minTemperatureCelsius: _matchingIntParameter(
             elementsByName['MinT']!,
             startTime,
             endTime,
-            i,
           ),
           maxTemperatureCelsius: _matchingIntParameter(
             elementsByName['MaxT']!,
             startTime,
             endTime,
-            i,
           ),
           comfortIndex: _matchingStringParameter(
             elementsByName['CI']!,
             startTime,
             endTime,
-            i,
           ),
         ),
       );
@@ -109,37 +104,35 @@ class LocationForecast extends Equatable {
     );
   }
 
+  static DateTime? _tryParseDateTime(Object? value) {
+    if (value is! String) return null;
+    return DateTime.tryParse(value);
+  }
+
   static DateTime _parseDateTime(Object? value) {
-    if (value is! String) {
-      throw const DataParsingFailure();
-    }
-    final parsed = DateTime.tryParse(value);
+    final parsed = _tryParseDateTime(value);
     if (parsed == null) {
       throw const DataParsingFailure();
     }
     return parsed;
   }
 
-  /// 依 `startTime`/`endTime` 在 [entries] 中尋找對應時段的原始資料；
-  /// 找不到相符時間時，退而使用相同索引位置（[fallbackIndex]）作為備援，
-  /// 以容忍極少數時段時間略有落差的情況。
+  /// 依 `startTime`/`endTime` 在 [entries] 中尋找對應時段的原始資料。
+  ///
+  /// 刻意不做「找不到相符時間就退而使用相同索引」之類的備援：中央氣象署
+  /// 這支 API 的各天氣要素（Wx/PoP/MinT/MaxT/CI）在正常情況下時間區段
+  /// 必定一致，若真的對不上，代表資料本身有異常，寧可整筆視為格式錯誤
+  /// （見呼叫端的 [DataParsingFailure]），也不要靜默配對到錯誤的時段。
   static Map<String, dynamic>? _findMatchingEntry(
     List<dynamic> entries,
     DateTime startTime,
     DateTime endTime,
-    int fallbackIndex,
   ) {
     for (final entry in entries) {
       if (entry is! Map<String, dynamic>) continue;
-      final entryStart = DateTime.tryParse(entry['startTime']?.toString() ?? '');
-      final entryEnd = DateTime.tryParse(entry['endTime']?.toString() ?? '');
+      final entryStart = _tryParseDateTime(entry['startTime']);
+      final entryEnd = _tryParseDateTime(entry['endTime']);
       if (entryStart == startTime && entryEnd == endTime) {
-        return entry;
-      }
-    }
-    if (fallbackIndex >= 0 && fallbackIndex < entries.length) {
-      final entry = entries[fallbackIndex];
-      if (entry is Map<String, dynamic>) {
         return entry;
       }
     }
@@ -162,9 +155,8 @@ class LocationForecast extends Equatable {
     List<dynamic> entries,
     DateTime startTime,
     DateTime endTime,
-    int fallbackIndex,
   ) {
-    final entry = _findMatchingEntry(entries, startTime, endTime, fallbackIndex);
+    final entry = _findMatchingEntry(entries, startTime, endTime);
     if (entry == null) {
       throw const DataParsingFailure();
     }
@@ -179,9 +171,8 @@ class LocationForecast extends Equatable {
     List<dynamic> entries,
     DateTime startTime,
     DateTime endTime,
-    int fallbackIndex,
   ) {
-    final entry = _findMatchingEntry(entries, startTime, endTime, fallbackIndex);
+    final entry = _findMatchingEntry(entries, startTime, endTime);
     if (entry == null) {
       throw const DataParsingFailure();
     }
@@ -192,9 +183,8 @@ class LocationForecast extends Equatable {
     List<dynamic> entries,
     DateTime startTime,
     DateTime endTime,
-    int fallbackIndex,
   ) {
-    final entry = _findMatchingEntry(entries, startTime, endTime, fallbackIndex);
+    final entry = _findMatchingEntry(entries, startTime, endTime);
     if (entry == null) return null;
     final parameter = entry['parameter'];
     if (parameter is! Map<String, dynamic>) return null;

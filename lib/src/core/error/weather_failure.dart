@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../constants/taiwan_locations.dart';
+
 /// 代表天氣查詢流程中所有可能發生的失敗情境。
 ///
 /// 每個子型別都附帶一段可直接呈現於 UI 的繁體中文說明文字（[message]），
@@ -19,7 +21,8 @@ sealed class WeatherFailure extends Equatable {
 
 /// 使用者尚未輸入地區名稱，或輸入內容僅包含空白字元。
 final class InvalidInputFailure extends WeatherFailure {
-  const InvalidInputFailure() : super('請輸入要查詢的地區名稱，例如：臺北市。');
+  const InvalidInputFailure()
+    : super('請輸入要查詢的地區名稱，例如：$kExampleLocationNameA。');
 }
 
 /// 尚未設定中央氣象署 API Key（`--dart-define=CWA_API_KEY=...`）。
@@ -51,7 +54,11 @@ final class ServerFailure extends WeatherFailure {
 /// 查詢的地區名稱不存在於 API 回傳資料中。
 final class LocationNotFoundFailure extends WeatherFailure {
   const LocationNotFoundFailure(this.locationName)
-    : super('查無「$locationName」的天氣預報資料，請確認地區名稱是否正確（例如：臺北市、臺中市、高雄市）。');
+    : super(
+        '查無「$locationName」的天氣預報資料，請確認地區名稱是否正確'
+        '（例如：$kExampleLocationNameA、$kExampleLocationNameB、'
+        '$kExampleLocationNameC）。',
+      );
 
   final String locationName;
 

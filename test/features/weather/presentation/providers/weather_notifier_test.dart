@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cwa_weather/src/core/error/weather_failure.dart';
 import 'package:cwa_weather/src/features/weather/data/models/location_forecast.dart';
 import 'package:cwa_weather/src/features/weather/data/models/weather_period.dart';
@@ -94,6 +96,54 @@ void main() {
       container.read(weatherNotifierProvider),
       const WeatherError(UnknownFailure()),
     );
+  });
+
+  test('較舊查詢的回應較晚抵達時，不會覆蓋較新查詢的結果', () async {
+    final taipeiCompleter = Completer<LocationForecast>();
+    final kaohsiungForecast = LocationForecast(
+      locationName: '高雄市',
+      periods: forecast.periods,
+    );
+
+    when(
+      () => repository.fetchForecast('臺北市'),
+    ).thenAnswer((_) => taipeiCompleter.future);
+    when(
+      () => repository.fetchForecast('高雄市'),
+    ).thenAnswer((_) async => kaohsiungForecast);
+
+    final notifier = container.read(weatherNotifierProvider.notifier);
+    final firstSearch = notifier.search('臺北市');
+    final secondSearch = notifier.search('高雄市');
+    await secondSearch;
+
+    expect(
+      container.read(weatherNotifierProvider),
+      WeatherSuccess(kaohsiungForecast),
+    );
+
+    taipeiCompleter.complete(forecast);
+    await firstSearch;
+
+    expect(
+      container.read(weatherNotifierProvider),
+      WeatherSuccess(kaohsiungForecast),
+    );
+  });
+
+  test('reset() 會讓尚未完成的查詢請求失效，不會在重設後覆蓋畫面', () async {
+    final completer = Completer<LocationForecast>();
+    when(
+      () => repository.fetchForecast('臺北市'),
+    ).thenAnswer((_) => completer.future);
+
+    final notifier = container.read(weatherNotifierProvider.notifier);
+    final search = notifier.search('臺北市');
+    notifier.reset();
+    completer.complete(forecast);
+    await search;
+
+    expect(container.read(weatherNotifierProvider), const WeatherInitial());
   });
 
   test('reset() 會將狀態還原為 WeatherInitial', () async {

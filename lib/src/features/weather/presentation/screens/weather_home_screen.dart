@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/taiwan_locations.dart';
+import '../../../../core/constants/taiwan_locations.dart';
 import '../providers/weather_notifier.dart';
 import '../state/weather_ui_state.dart';
 import '../widgets/weather_error_view.dart';
@@ -32,6 +32,11 @@ class _WeatherHomeScreenState extends ConsumerState<WeatherHomeScreen> {
     ref.read(weatherNotifierProvider.notifier).search(value);
   }
 
+  void _clear() {
+    _controller.clear();
+    ref.read(weatherNotifierProvider.notifier).reset();
+  }
+
   void _selectSuggestion(String locationName) {
     _controller
       ..text = locationName
@@ -55,6 +60,7 @@ class _WeatherHomeScreenState extends ConsumerState<WeatherHomeScreen> {
                 controller: _controller,
                 isLoading: isLoading,
                 onSearch: _search,
+                onClear: _clear,
               ),
               const SizedBox(height: 12),
               _LocationSuggestions(

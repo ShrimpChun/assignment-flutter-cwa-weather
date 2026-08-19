@@ -5,6 +5,7 @@ class WeatherSearchBar extends StatelessWidget {
   const WeatherSearchBar({
     required this.controller,
     required this.onSearch,
+    required this.onClear,
     required this.isLoading,
     super.key,
   });
@@ -13,6 +14,9 @@ class WeatherSearchBar extends StatelessWidget {
 
   /// 使用者點擊確認按鈕或於鍵盤按下搜尋鍵時觸發，帶入目前輸入框內容。
   final ValueChanged<String> onSearch;
+
+  /// 使用者點擊欄位內的清除按鈕時觸發，讓呼叫端一併重設查詢結果狀態。
+  final VoidCallback onClear;
 
   /// 查詢進行中時停用輸入與按鈕，避免重複送出請求。
   final bool isLoading;
@@ -40,7 +44,7 @@ class WeatherSearchBar extends StatelessWidget {
                   return IconButton(
                     icon: const Icon(Icons.clear_rounded),
                     tooltip: '清除',
-                    onPressed: isLoading ? null : controller.clear,
+                    onPressed: isLoading ? null : onClear,
                   );
                 },
               ),
