@@ -23,7 +23,10 @@ class WeatherRemoteDataSource {
   /// 中央氣象署開放資料平台 API Key，由呼叫端注入（見類別文件說明）。
   final String apiKey;
 
-  Future<LocationForecast> fetchForecast(String locationName) async {
+  Future<LocationForecast> fetchForecast(
+    String locationName, {
+    CancelToken? cancelToken,
+  }) async {
     if (apiKey.trim().isEmpty) {
       throw const MissingApiKeyFailure();
     }
@@ -37,6 +40,7 @@ class WeatherRemoteDataSource {
           'locationName': locationName,
           'format': 'JSON',
         },
+        cancelToken: cancelToken,
       );
     } on DioException catch (error) {
       throw _mapDioException(error);
@@ -65,12 +69,33 @@ class WeatherRemoteDataSource {
       throw LocationNotFoundFailure(locationName);
     }
 
-    final firstLocation = locations.first;
-    if (firstLocation is! Map<String, dynamic>) {
+    final matchedLocation = _selectLocation(locations, locationName);
+    if (matchedLocation == null) {
       throw const DataParsingFailure();
     }
 
-    return LocationForecast.fromJson(firstLocation);
+    return LocationForecast.fromJson(matchedLocation);
+  }
+
+  /// 從 `records.location` 陣列中挑出與查詢地區名稱相符的項目。
+  ///
+  /// 正常情況下這支 API 以 `locationName` 過濾後只會回傳 0 或 1 筆資料，
+  /// 但仍優先以名稱完全相符者為準，而非不加驗證地直接取第一筆──
+  /// 避免日後 API 行為調整為回傳多筆候選地區時，誤將他縣市的天氣
+  /// 顯示成使用者查詢的地區。找不到相符名稱時，才退而使用第一筆。
+  Map<String, dynamic>? _selectLocation(
+    List<dynamic> locations,
+    String locationName,
+  ) {
+    Map<String, dynamic>? fallback;
+    for (final location in locations) {
+      if (location is! Map<String, dynamic>) continue;
+      fallback ??= location;
+      if (location['locationName']?.toString().trim() == locationName) {
+        return location;
+      }
+    }
+    return fallback;
   }
 
   /// 判斷 API 回應中的 `success` 欄位是否代表成功。

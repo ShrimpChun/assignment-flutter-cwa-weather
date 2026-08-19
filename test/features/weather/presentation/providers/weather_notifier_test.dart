@@ -6,6 +6,7 @@ import 'package:cwa_weather/src/features/weather/data/models/weather_period.dart
 import 'package:cwa_weather/src/features/weather/data/repositories/weather_repository.dart';
 import 'package:cwa_weather/src/features/weather/presentation/providers/weather_notifier.dart';
 import 'package:cwa_weather/src/features/weather/presentation/state/weather_ui_state.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -31,6 +32,18 @@ void main() {
     ],
   );
 
+  void stubFetch(
+    String locationName,
+    Future<LocationForecast> Function(Invocation) answer,
+  ) {
+    when(
+      () => repository.fetchForecast(
+        locationName,
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(answer);
+  }
+
   setUp(() {
     repository = _MockWeatherRepository();
     container = ProviderContainer(
@@ -50,11 +63,16 @@ void main() {
       container.read(weatherNotifierProvider),
       const WeatherError(InvalidInputFailure()),
     );
-    verifyNever(() => repository.fetchForecast(any()));
+    verifyNever(
+      () => repository.fetchForecast(
+        any(),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    );
   });
 
   test('查詢成功時，先切換為 loading 再切換為 success', () async {
-    when(() => repository.fetchForecast('臺北市')).thenAnswer((_) async {
+    stubFetch('臺北市', (_) async {
       expect(container.read(weatherNotifierProvider), const WeatherLoading());
       return forecast;
     });
@@ -65,19 +83,23 @@ void main() {
   });
 
   test('查詢時會自動去除輸入前後空白', () async {
-    when(
-      () => repository.fetchForecast('臺北市'),
-    ).thenAnswer((_) async => forecast);
+    stubFetch('臺北市', (_) async => forecast);
 
     await container.read(weatherNotifierProvider.notifier).search('  臺北市  ');
 
-    verify(() => repository.fetchForecast('臺北市')).called(1);
+    verify(
+      () => repository.fetchForecast(
+        '臺北市',
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
   });
 
   test('查詢失敗時切換為 WeatherError 並帶入對應的 Failure', () async {
-    when(
-      () => repository.fetchForecast('新竹市'),
-    ).thenThrow(const LocationNotFoundFailure('新竹市'));
+    stubFetch(
+      '新竹市',
+      (_) => Future.error(const LocationNotFoundFailure('新竹市')),
+    );
 
     await container.read(weatherNotifierProvider.notifier).search('新竹市');
 
@@ -88,7 +110,7 @@ void main() {
   });
 
   test('資料來源拋出非 WeatherFailure 的例外時，轉換為 UnknownFailure', () async {
-    when(() => repository.fetchForecast('臺北市')).thenThrow(Exception('boom'));
+    stubFetch('臺北市', (_) => Future.error(Exception('boom')));
 
     await container.read(weatherNotifierProvider.notifier).search('臺北市');
 
@@ -105,12 +127,8 @@ void main() {
       periods: forecast.periods,
     );
 
-    when(
-      () => repository.fetchForecast('臺北市'),
-    ).thenAnswer((_) => taipeiCompleter.future);
-    when(
-      () => repository.fetchForecast('高雄市'),
-    ).thenAnswer((_) async => kaohsiungForecast);
+    stubFetch('臺北市', (_) => taipeiCompleter.future);
+    stubFetch('高雄市', (_) async => kaohsiungForecast);
 
     final notifier = container.read(weatherNotifierProvider.notifier);
     final firstSearch = notifier.search('臺北市');
@@ -131,11 +149,76 @@ void main() {
     );
   });
 
-  test('reset() 會讓尚未完成的查詢請求失效，不會在重設後覆蓋畫面', () async {
+  test('送出新查詢時，會主動取消前一個尚未完成的請求', () async {
     final completer = Completer<LocationForecast>();
-    when(
-      () => repository.fetchForecast('臺北市'),
-    ).thenAnswer((_) => completer.future);
+    stubFetch('臺北市', (_) => completer.future);
+    stubFetch('高雄市', (_) async => forecast);
+
+    final notifier = container.read(weatherNotifierProvider.notifier);
+    final firstSearch = notifier.search('臺北市');
+
+    final firstCall = verify(
+      () => repository.fetchForecast(
+        '臺北市',
+        cancelToken: captureAny(named: 'cancelToken'),
+      ),
+    ).captured;
+    final firstToken = firstCall.single as CancelToken;
+    expect(firstToken.isCancelled, isFalse);
+
+    await notifier.search('高雄市');
+
+    expect(firstToken.isCancelled, isTrue);
+
+    completer.complete(forecast);
+    await firstSearch;
+  });
+
+  test('refresh() 不會切換為 WeatherLoading，重新整理期間仍保留原有結果', () async {
+    final notifier = container.read(weatherNotifierProvider.notifier);
+    stubFetch('臺北市', (_) async => forecast);
+    await notifier.search('臺北市');
+    expect(container.read(weatherNotifierProvider), WeatherSuccess(forecast));
+
+    final refreshedForecast = LocationForecast(
+      locationName: '臺北市',
+      periods: forecast.periods,
+    );
+    final completer = Completer<LocationForecast>();
+    stubFetch('臺北市', (_) => completer.future);
+
+    final refresh = notifier.refresh('臺北市');
+    expect(container.read(weatherNotifierProvider), WeatherSuccess(forecast));
+
+    completer.complete(refreshedForecast);
+    await refresh;
+
+    expect(
+      container.read(weatherNotifierProvider),
+      WeatherSuccess(refreshedForecast),
+    );
+  });
+
+  test('refresh() 失敗時切換為 WeatherError', () async {
+    final notifier = container.read(weatherNotifierProvider.notifier);
+    stubFetch('臺北市', (_) async => forecast);
+    await notifier.search('臺北市');
+
+    stubFetch(
+      '臺北市',
+      (_) => Future.error(const ServerFailure(statusCode: 500)),
+    );
+    await notifier.refresh('臺北市');
+
+    expect(
+      container.read(weatherNotifierProvider),
+      const WeatherError(ServerFailure(statusCode: 500)),
+    );
+  });
+
+  test('reset() 會取消尚未完成的查詢請求，不會在重設後覆蓋畫面', () async {
+    final completer = Completer<LocationForecast>();
+    stubFetch('臺北市', (_) => completer.future);
 
     final notifier = container.read(weatherNotifierProvider.notifier);
     final search = notifier.search('臺北市');
@@ -147,9 +230,7 @@ void main() {
   });
 
   test('reset() 會將狀態還原為 WeatherInitial', () async {
-    when(
-      () => repository.fetchForecast('臺北市'),
-    ).thenAnswer((_) async => forecast);
+    stubFetch('臺北市', (_) async => forecast);
     final notifier = container.read(weatherNotifierProvider.notifier);
     await notifier.search('臺北市');
 

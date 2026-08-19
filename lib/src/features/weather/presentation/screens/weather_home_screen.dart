@@ -21,6 +21,12 @@ class WeatherHomeScreen extends ConsumerStatefulWidget {
 class _WeatherHomeScreenState extends ConsumerState<WeatherHomeScreen> {
   final _controller = TextEditingController();
 
+  /// 最近一次實際送出查詢（或下拉刷新）的地區名稱，用於錯誤畫面的
+  /// 「重試」按鈕。刻意不直接讀取 [_controller] 目前的內容──使用者
+  /// 可能在查詢成功後修改了輸入框文字卻未按下確認，此時輸入框內容
+  /// 已經與畫面上顯示（或查詢失敗）的地區脫勾。
+  String? _lastAttemptedLocation;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -29,11 +35,19 @@ class _WeatherHomeScreenState extends ConsumerState<WeatherHomeScreen> {
 
   void _search(String value) {
     FocusScope.of(context).unfocus();
+    final locationName = value.trim();
+    _lastAttemptedLocation = locationName.isEmpty ? null : locationName;
     ref.read(weatherNotifierProvider.notifier).search(value);
+  }
+
+  Future<void> _refresh(String locationName) {
+    _lastAttemptedLocation = locationName;
+    return ref.read(weatherNotifierProvider.notifier).refresh(locationName);
   }
 
   void _clear() {
     _controller.clear();
+    _lastAttemptedLocation = null;
     ref.read(weatherNotifierProvider.notifier).reset();
   }
 
@@ -88,16 +102,14 @@ class _WeatherHomeScreenState extends ConsumerState<WeatherHomeScreen> {
       WeatherSuccess(:final forecast) => WeatherResultView(
         key: ValueKey('result-${forecast.locationName}'),
         forecast: forecast,
-        onRefresh: () => ref
-            .read(weatherNotifierProvider.notifier)
-            .search(forecast.locationName),
+        onRefresh: () => _refresh(forecast.locationName),
       ),
       WeatherError(:final failure) => WeatherErrorView(
         key: ValueKey('error-${failure.message}'),
         failure: failure,
-        onRetry: _controller.text.trim().isEmpty
+        onRetry: _lastAttemptedLocation == null
             ? null
-            : () => _search(_controller.text),
+            : () => _search(_lastAttemptedLocation!),
       ),
     };
   }

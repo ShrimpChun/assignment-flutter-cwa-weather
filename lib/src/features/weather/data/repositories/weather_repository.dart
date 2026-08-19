@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../datasources/weather_remote_data_source.dart';
@@ -8,7 +9,12 @@ abstract class WeatherRepository {
   /// 依地區名稱取得今明 36 小時天氣預報。
   ///
   /// 失敗時一律拋出 `weather_failure.dart` 中定義的 `WeatherFailure` 子型別。
-  Future<LocationForecast> fetchForecast(String locationName);
+  /// 傳入 [cancelToken] 可在呼叫端（例如發出更新的查詢）主動取消這次
+  /// 尚未完成的請求，避免已經過期的回應仍持續佔用網路資源。
+  Future<LocationForecast> fetchForecast(
+    String locationName, {
+    CancelToken? cancelToken,
+  });
 }
 
 class WeatherRepositoryImpl implements WeatherRepository {
@@ -17,8 +23,14 @@ class WeatherRepositoryImpl implements WeatherRepository {
   final WeatherRemoteDataSource _remoteDataSource;
 
   @override
-  Future<LocationForecast> fetchForecast(String locationName) async {
-    return _remoteDataSource.fetchForecast(locationName);
+  Future<LocationForecast> fetchForecast(
+    String locationName, {
+    CancelToken? cancelToken,
+  }) async {
+    return _remoteDataSource.fetchForecast(
+      locationName,
+      cancelToken: cancelToken,
+    );
   }
 }
 

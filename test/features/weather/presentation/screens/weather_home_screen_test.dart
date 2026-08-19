@@ -30,6 +30,27 @@ void main() {
     ],
   );
 
+  void stubFetch(
+    String locationName,
+    Future<LocationForecast> Function(Invocation) answer,
+  ) {
+    when(
+      () => repository.fetchForecast(
+        locationName,
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(answer);
+  }
+
+  void stubFetchError(String locationName, Object error) {
+    when(
+      () => repository.fetchForecast(
+        locationName,
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenThrow(error);
+  }
+
   setUp(() {
     repository = _MockWeatherRepository();
   });
@@ -51,9 +72,7 @@ void main() {
     tester,
   ) async {
     final completer = Completer<LocationForecast>();
-    when(
-      () => repository.fetchForecast('臺北市'),
-    ).thenAnswer((_) => completer.future);
+    stubFetch('臺北市', (_) => completer.future);
 
     await tester.pumpWidget(buildTestable());
     await tester.enterText(
@@ -80,15 +99,18 @@ void main() {
 
     expect(find.byKey(const Key('weatherErrorView')), findsOneWidget);
     expect(find.text(const InvalidInputFailure().message), findsOneWidget);
-    verifyNever(() => repository.fetchForecast(any()));
+    verifyNever(
+      () => repository.fetchForecast(
+        any(),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    );
   });
 
   testWidgets('查詢成功後點擊清除按鈕，會清空輸入框並將畫面重設為初始狀態', (
     tester,
   ) async {
-    when(
-      () => repository.fetchForecast('臺北市'),
-    ).thenAnswer((_) async => taipeiForecast);
+    stubFetch('臺北市', (_) async => taipeiForecast);
 
     await tester.pumpWidget(buildTestable());
     await tester.enterText(
@@ -110,9 +132,7 @@ void main() {
   });
 
   testWidgets('查詢地區不存在時，顯示對應的錯誤說明', (tester) async {
-    when(
-      () => repository.fetchForecast('不存在的地區'),
-    ).thenThrow(const LocationNotFoundFailure('不存在的地區'));
+    stubFetchError('不存在的地區', const LocationNotFoundFailure('不存在的地區'));
 
     await tester.pumpWidget(buildTestable());
     await tester.enterText(
@@ -134,16 +154,19 @@ void main() {
       locationName: '高雄市',
       periods: taipeiForecast.periods,
     );
-    when(
-      () => repository.fetchForecast('高雄市'),
-    ).thenAnswer((_) async => forecast);
+    stubFetch('高雄市', (_) async => forecast);
 
     await tester.pumpWidget(buildTestable());
     await tester.tap(find.text('高雄市'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('weatherResultView')), findsOneWidget);
-    verify(() => repository.fetchForecast('高雄市')).called(1);
+    verify(
+      () => repository.fetchForecast(
+        '高雄市',
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
   });
 
   testWidgets('於鍵盤輸入完成動作時也會觸發查詢', (tester) async {
@@ -151,9 +174,7 @@ void main() {
       locationName: '臺中市',
       periods: taipeiForecast.periods,
     );
-    when(
-      () => repository.fetchForecast('臺中市'),
-    ).thenAnswer((_) async => forecast);
+    stubFetch('臺中市', (_) async => forecast);
 
     await tester.pumpWidget(buildTestable());
     await tester.enterText(
@@ -168,9 +189,7 @@ void main() {
 
   testWidgets('查詢中停用輸入框與確認按鈕，避免重複送出', (tester) async {
     final completer = Completer<LocationForecast>();
-    when(
-      () => repository.fetchForecast('臺北市'),
-    ).thenAnswer((_) => completer.future);
+    stubFetch('臺北市', (_) => completer.future);
 
     await tester.pumpWidget(buildTestable());
     await tester.enterText(
@@ -192,5 +211,37 @@ void main() {
 
     completer.complete(taipeiForecast);
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('下拉刷新期間仍保留原有結果畫面，不會被 Loading 畫面取代', (
+    tester,
+  ) async {
+    stubFetch('臺北市', (_) async => taipeiForecast);
+    await tester.pumpWidget(buildTestable());
+    await tester.enterText(
+      find.byKey(const Key('weatherSearchField')),
+      '臺北市',
+    );
+    await tester.tap(find.byKey(const Key('weatherSearchConfirmButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('weatherResultView')), findsOneWidget);
+
+    final completer = Completer<LocationForecast>();
+    stubFetch('臺北市', (_) => completer.future);
+
+    await tester.fling(
+      find.byKey(const Key('weatherResultView')),
+      const Offset(0, 300),
+      1000,
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('weatherResultView')), findsOneWidget);
+    expect(find.byKey(const Key('weatherLoadingView')), findsNothing);
+
+    completer.complete(taipeiForecast);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('weatherResultView')), findsOneWidget);
   });
 }

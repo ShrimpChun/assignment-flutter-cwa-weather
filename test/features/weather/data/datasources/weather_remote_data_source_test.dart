@@ -29,6 +29,7 @@ void main() {
       () => dio.get<dynamic>(
         any(),
         queryParameters: any(named: 'queryParameters'),
+        cancelToken: any(named: 'cancelToken'),
       ),
     ).thenAnswer((_) async => response);
   }
@@ -45,6 +46,7 @@ void main() {
         () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       );
     });
@@ -70,12 +72,35 @@ void main() {
         () => dio.get<dynamic>(
           captureAny(),
           queryParameters: captureAny(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).captured;
       expect(captured[0], ApiEndpoints.generalForecast36h);
       final queryParameters = captured[1] as Map<String, dynamic>;
       expect(queryParameters['Authorization'], 'fake-key');
       expect(queryParameters['locationName'], '臺北市');
+    });
+
+    test('API 回傳多筆地區時，挑選名稱與查詢條件相符的那一筆，而非直接取第一筆', () async {
+      final wrongFirst = Map<String, dynamic>.from(
+        validForecastResponse(locationName: '新北市'),
+      )['records']['location'][0];
+      final requested = Map<String, dynamic>.from(
+        validForecastResponse(),
+      )['records']['location'][0];
+      stubGet(
+        responseWith({
+          'success': 'true',
+          'records': {
+            'location': [wrongFirst, requested],
+          },
+        }),
+      );
+      final dataSource = WeatherRemoteDataSource(dio, apiKey: 'fake-key');
+
+      final forecast = await dataSource.fetchForecast('臺北市');
+
+      expect(forecast.locationName, '臺北市');
     });
 
     test('地區查無資料（location 為空陣列）時拋出 LocationNotFoundFailure', () async {
@@ -163,6 +188,7 @@ void main() {
         () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
         DioException(
@@ -185,6 +211,7 @@ void main() {
         () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
         DioException(
@@ -206,6 +233,7 @@ void main() {
         () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
         DioException(
@@ -228,6 +256,7 @@ void main() {
         () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
         DioException(
@@ -251,6 +280,7 @@ void main() {
         () => dio.get<dynamic>(
           any(),
           queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
         DioException(

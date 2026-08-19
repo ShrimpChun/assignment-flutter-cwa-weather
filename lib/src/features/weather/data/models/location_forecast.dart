@@ -5,7 +5,12 @@ import 'weather_period.dart';
 
 /// 單一地區的天氣預報資料，包含地區名稱與其下各時段預報。
 class LocationForecast extends Equatable {
-  const LocationForecast({required this.locationName, required this.periods});
+  LocationForecast({required this.locationName, required this.periods})
+    : assert(
+        periods.isNotEmpty,
+        'periods 不可為空：一份天氣預報至少要有一個時段才有意義，'
+        '呼叫端若無法取得任何時段，應改為拋出 DataParsingFailure。',
+      );
 
   /// 地區名稱，例如「臺北市」。
   final String locationName;
@@ -151,20 +156,36 @@ class LocationForecast extends Equatable {
     return name;
   }
 
-  static int _matchingIntParameter(
+  /// [_matchingIntParameter] 與 [_matchingStringParameter] 共用的核心邏輯：
+  /// 找出對應時段的資料，再交由 [parse] 轉換成目標型別；找不到相符時段時
+  /// 一律視為格式錯誤。這兩個必要欄位（MinT/MaxT、CI）刻意採取「一有異常
+  /// 就整筆拒絕」的嚴格態度，與下方 [_matchingNullableIntParameter]
+  /// 對待「可選欄位」PoP 的寬容態度不同（詳見該方法的說明）。
+  static T _matchingParameter<T>(
     List<dynamic> entries,
     DateTime startTime,
     DateTime endTime,
+    T Function(String parameterName) parse,
   ) {
     final entry = _findMatchingEntry(entries, startTime, endTime);
     if (entry == null) {
       throw const DataParsingFailure();
     }
-    final value = int.tryParse(_parameterName(entry));
-    if (value == null) {
-      throw const DataParsingFailure();
-    }
-    return value;
+    return parse(_parameterName(entry));
+  }
+
+  static int _matchingIntParameter(
+    List<dynamic> entries,
+    DateTime startTime,
+    DateTime endTime,
+  ) {
+    return _matchingParameter(entries, startTime, endTime, (name) {
+      final value = int.tryParse(name);
+      if (value == null) {
+        throw const DataParsingFailure();
+      }
+      return value;
+    });
   }
 
   static String _matchingStringParameter(
@@ -172,13 +193,14 @@ class LocationForecast extends Equatable {
     DateTime startTime,
     DateTime endTime,
   ) {
-    final entry = _findMatchingEntry(entries, startTime, endTime);
-    if (entry == null) {
-      throw const DataParsingFailure();
-    }
-    return _parameterName(entry);
+    return _matchingParameter(entries, startTime, endTime, (name) => name);
   }
 
+  /// 降雨機率（PoP）屬於可選欄位：整個要素缺席時（見 [fromJson]）已經
+  /// 容許 `rainProbabilityPercent` 為 null，因此這裡對「格式異常」也採
+  /// 同樣寬容的態度──找不到對應時段、或欄位型別不符、或數值無法解析，
+  /// 一律回傳 null 讓畫面略過顯示，而不像 MinT/MaxT/CI 等必要欄位那樣
+  /// 讓整份預報直接判定為 [DataParsingFailure]。
   static int? _matchingNullableIntParameter(
     List<dynamic> entries,
     DateTime startTime,
