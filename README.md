@@ -189,3 +189,24 @@ flutter test
 - 本 App 僅串接「一般天氣預報－今明 36 小時」（`F-C0032-001`），
   不含鄉鎮市區等級或未來一週預報。
 - 目前僅提供 Android／iOS 平台設定；未產生 Web／桌面平台專案檔。
+
+## 開發工具說明
+
+本專案的程式碼與文件是與 [Claude Code](https://claude.com/claude-code)
+（Anthropic 推出的 CLI 開發代理）協作完成，實際使用方式如下：
+
+- 專案骨架建置：以 `flutter create` 產生 Android／iOS 平台骨架，並由
+  Claude Code 加入依賴套件（dio、flutter_riverpod、mocktail 等）與
+  嚴格化 `analysis_options.yaml` 靜態分析規則。
+- 分層架構與功能實作：由 Claude Code 依「資料層 → 狀態管理 → 呈現層」
+  的分層架構，撰寫 API 資料解析、Repository/DataSource、Riverpod
+  狀態管理，以及主畫面與四種狀態 Widget。
+- 測試撰寫：由 Claude Code 撰寫涵蓋各種正常／錯誤情境的單元測試與
+  Widget 測試，並在撰寫過程中實際發現並修正了程式中的真實缺陷。
+- 程式碼審查與反覆修正：透過 Claude Code 的 `code-review` 技能，
+  分兩輪對整份實作進行嚴格審查，找出競速條件、下拉刷新體驗、資料
+  一致性等問題後逐一修正，並補上對應的回歸測試。
+- 實機驗證：由 Claude Code 於 Android／iOS 模擬器上實際建置、安裝、
+  操作 App，以真實 API Key 驗證各項功能與畫面行為。
+- 每一項改動皆拆分為獨立、附有清楚說明的 git commit，方便追溯每個
+  階段實際做了什麼調整。
