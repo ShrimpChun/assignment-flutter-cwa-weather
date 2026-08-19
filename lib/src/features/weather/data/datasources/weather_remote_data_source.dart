@@ -12,13 +12,19 @@ import '../models/location_forecast.dart';
 /// 此類別只關心「怎麼把一個地區名稱換成 [LocationForecast]」，
 /// 所有可能發生的錯誤都會被轉換成 [WeatherFailure] 的子型別拋出，
 /// 呼叫端（Repository / Notifier）不需要認識 Dio 或原始 JSON 的細節。
+///
+/// API Key 以建構子注入（而非直接讀取 [AppConfig] 全域常數），
+/// 讓單元測試能輕易替換為假金鑰，不必依賴編譯期環境變數。
 class WeatherRemoteDataSource {
-  const WeatherRemoteDataSource(this._dio);
+  const WeatherRemoteDataSource(this._dio, {required this.apiKey});
 
   final Dio _dio;
 
+  /// 中央氣象署開放資料平台 API Key，由呼叫端注入（見類別文件說明）。
+  final String apiKey;
+
   Future<LocationForecast> fetchForecast(String locationName) async {
-    if (!AppConfig.hasApiKey) {
+    if (apiKey.trim().isEmpty) {
       throw const MissingApiKeyFailure();
     }
 
@@ -27,7 +33,7 @@ class WeatherRemoteDataSource {
       response = await _dio.get<dynamic>(
         ApiEndpoints.generalForecast36h,
         queryParameters: {
-          'Authorization': AppConfig.cwaApiKey,
+          'Authorization': apiKey,
           'locationName': locationName,
           'format': 'JSON',
         },
@@ -95,5 +101,8 @@ class WeatherRemoteDataSource {
 final weatherRemoteDataSourceProvider = Provider<WeatherRemoteDataSource>((
   ref,
 ) {
-  return WeatherRemoteDataSource(ref.watch(dioProvider));
+  return WeatherRemoteDataSource(
+    ref.watch(dioProvider),
+    apiKey: AppConfig.cwaApiKey,
+  );
 });

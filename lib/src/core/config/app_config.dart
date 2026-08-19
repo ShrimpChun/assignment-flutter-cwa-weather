@@ -13,6 +13,4 @@
 /// 而不是讓底層 HTTP 請求以難以理解的方式失敗。
 abstract final class AppConfig {
   static const String cwaApiKey = String.fromEnvironment('CWA_API_KEY');
-
-  static bool get hasApiKey => cwaApiKey.trim().isNotEmpty;
 }

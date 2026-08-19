@@ -77,8 +77,8 @@ class _WeatherHomeScreenState extends ConsumerState<WeatherHomeScreen> {
 
   Widget _buildContent(WeatherUiState state) {
     return switch (state) {
-      WeatherInitial() => const WeatherInitialView(),
-      WeatherLoading() => const WeatherLoadingView(),
+      WeatherInitial() => const WeatherInitialView(key: ValueKey('initial')),
+      WeatherLoading() => const WeatherLoadingView(key: ValueKey('loading')),
       WeatherSuccess(:final forecast) => WeatherResultView(
         key: ValueKey('result-${forecast.locationName}'),
         forecast: forecast,

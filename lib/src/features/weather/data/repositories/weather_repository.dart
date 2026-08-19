@@ -17,7 +17,7 @@ class WeatherRepositoryImpl implements WeatherRepository {
   final WeatherRemoteDataSource _remoteDataSource;
 
   @override
-  Future<LocationForecast> fetchForecast(String locationName) {
+  Future<LocationForecast> fetchForecast(String locationName) async {
     return _remoteDataSource.fetchForecast(locationName);
   }
 }
