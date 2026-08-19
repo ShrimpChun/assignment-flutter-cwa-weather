@@ -74,7 +74,6 @@ class WeatherRemoteDataSource {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.connectionError:
-        return const NetworkFailure();
       case DioExceptionType.badCertificate:
         return const NetworkFailure();
       case DioExceptionType.cancel:
@@ -86,6 +85,7 @@ class WeatherRemoteDataSource {
         }
         return ServerFailure(statusCode: statusCode);
       case DioExceptionType.unknown:
+      case DioExceptionType.transformTimeout:
         return const NetworkFailure();
     }
   }

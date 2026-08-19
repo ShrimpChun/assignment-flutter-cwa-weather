@@ -50,7 +50,7 @@ final class ServerFailure extends WeatherFailure {
 
 /// 查詢的地區名稱不存在於 API 回傳資料中。
 final class LocationNotFoundFailure extends WeatherFailure {
-  LocationNotFoundFailure(this.locationName)
+  const LocationNotFoundFailure(this.locationName)
     : super('查無「$locationName」的天氣預報資料，請確認地區名稱是否正確（例如：臺北市、臺中市、高雄市）。');
 
   final String locationName;
